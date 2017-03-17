@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Statistics Dashboard</title>
+    <title>Activities Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link href="https://netdna.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet" media="screen" />
     <link href="css/style.css" rel="stylesheet" media="screen" />
@@ -38,7 +38,7 @@
   <body>
     <main role="main" id="main"></main>
 
-    <script id="statistics-dashboard" type="text/template">
+    <script id="activities-dashboard" type="text/template">
       <div class="provider_status">
       </div>
       <div class="provider_login">
@@ -91,7 +91,7 @@
       <span>
         Groups: <%= groups %> [<a href="#" class="add_group_button">+</a>|<a href="#" class="remove_group_button">-</a>],
         Repos: <%= repos %> [<a href="#" class="add_repo_button">+</a>|<a href="#" class="remove_repo_button">-</a>],
-        Contributions: <%= contributions %> [<a href="#" class="add_contribution_button">+</a>|<a href="#" class="remove_contribution_button">-</a>]
+        Activities: <%= activities %> [<a href="#" class="add_activity_button">+</a>|<a href="#" class="remove_activity_button">-</a>]
       </span>
       <span class="query_groups glyphicon glyphicon-refresh" title="Refresh groups"></span>
       <div class="btn-group btn-group-sm">
@@ -110,26 +110,27 @@
 
     <script id="summary-template" type="text/template">
       Summary:
-      <% if (contribution_summary.summary.commits > 0) {
-        kinds = {'additions': '+', 'deletions': '-', 'commits': 'c'}
-        for (var kind in kinds) {
-          sum = contribution_summary.summary[kind]
-          if (sum) {
-            title = ''
-            for (var i = 0; i < contribution_summary.ordered_logins[kind].length; ++i) {
-              login = contribution_summary.ordered_logins[kind][i]
-              if (contribution_summary.by_login[login][kind]) {
-                if (title != '') {
-                  title += '\n'
-                }
-                count = contribution_summary.by_login[login][kind]
-                title += login + ': ' + count +
-                  ' (' + (100.0 * count / sum).toPrecision(3) + '%)'
-              }
-            } %>
-            <span class="badge badge-<%= kind %>" title="<%= title %>"><%= kinds[kind] %><%= sum %></span>
-          <% }
-        }
+      <% if (matched_activity_summary.hasAnyActivity()) {
+        if (matched_activity_summary.hasIssueActivity()) { %>
+          <span class="badge badge-issues" title="Issues">i
+            <span title="Issues opened"><%= matched_activity_summary.issues_opened %></span> |
+            <span title="Issues closed"><%= matched_activity_summary.issues_closed %></span> |
+            <span title="Issues comments"><%= matched_activity_summary.issue_comments %></span>
+          </span>
+        <% }
+        if (matched_activity_summary.hasPullRequestActivity()) { %>
+          <span class="badge badge-pull-requests" title="Pull requests">pr
+            <span title="PR opened"><%= matched_activity_summary.pull_requests_opened %></span> |
+            <span title="PR closed"><%= matched_activity_summary.pull_requests_closed %></span> |
+            <span title="PR comments"><%= matched_activity_summary.pull_request_comments %></span>
+          </span>
+        <% }
+        if (matched_activity_summary.tags) { %>
+          <span class="badge badge-tags" title="Tags">t <%= matched_activity_summary.tags %></span>
+        <% }
+        if (matched_activity_summary.commits) { %>
+          <span class="badge badge-commits" title="Commits">c <%= matched_activity_summary.commits %></span>
+        <% }
       } %>
     </script>
 
@@ -137,6 +138,9 @@
     <script id="filter-template" type="text/template">
       <input type="checkbox" name="filter_starred" id="filter_starred"<% if (starred) { print(' checked="checked"') } %>/>
       <label for="filter_starred">Filter starred</label>
+
+      <label for="filter_age_days">Filter recent activity</label>
+      <input type="number" name="filter_age_days" min="0" value="<%= age_days %>" /> days
     </script>
 
 
@@ -144,26 +148,27 @@
       <span class="actions">
         <span class="query_repos glyphicon glyphicon-refresh"></span>
         <span class="loader"><img src="img/loader.gif" width="16px" height="16px" alt="" /></span>
-        <% if (contribution_summary.summary.commits > 0) {
-          kinds = {'additions': '+', 'deletions': '-', 'commits': 'c'}
-          for (var kind in kinds) {
-            sum = contribution_summary.summary[kind]
-            if (sum) {
-              title = ''
-              for (var i = 0; i < contribution_summary.ordered_logins[kind].length; ++i) {
-                login = contribution_summary.ordered_logins[kind][i]
-                if (contribution_summary.by_login[login][kind]) {
-                  if (title != '') {
-                    title += '\n'
-                  }
-                  count = contribution_summary.by_login[login][kind]
-                  title += login + ': ' + count +
-                    ' (' + (100.0 * count / sum).toPrecision(3) + '%)'
-                }
-              } %>
-              <span class="badge badge-<%= kind %>" title="<%= title %>"><%= kinds[kind] %><%= sum %></span>
-            <% }
-          }
+        <% if (matched_activity_summary.hasAnyActivity()) {
+          if (matched_activity_summary.hasIssueActivity()) { %>
+            <span class="badge badge-issues" title="Issues">i
+              <span title="Issues opened"><%= matched_activity_summary.issues_opened %></span> |
+              <span title="Issues closed"><%= matched_activity_summary.issues_closed %></span> |
+              <span title="Issues comments"><%= matched_activity_summary.issue_comments %></span>
+            </span>
+          <% }
+          if (matched_activity_summary.hasPullRequestActivity()) { %>
+            <span class="badge badge-pull-requests" title="Pull requests">pr
+              <span title="PR opened"><%= matched_activity_summary.pull_requests_opened %></span> |
+              <span title="PR closed"><%= matched_activity_summary.pull_requests_closed %></span> |
+              <span title="PR comments"><%= matched_activity_summary.pull_request_comments %></span>
+            </span>
+          <% }
+          if (matched_activity_summary.tags) { %>
+            <span class="badge badge-tags" title="Tags">t <%= matched_activity_summary.tags %></span>
+          <% }
+          if (matched_activity_summary.commits) { %>
+            <span class="badge badge-commits" title="Commits">c <%= matched_activity_summary.commits %></span>
+          <% }
         } %>
       </span>
       <img class="avatar" src="<%= avatar_url %>" height="36px" width="36px" alt="" />
@@ -176,32 +181,35 @@
 
     <script id="repo-header-template" type="text/template">
       <span class="actions">
-        <span class="reset_contributions glyphicon glyphicon-remove"></span>
-        <span class="query_contributions glyphicon glyphicon-refresh"></span>
-        <span class="compute_contributions glyphicon glyphicon-time"></span>
+        <span class="reset_activities glyphicon glyphicon-remove"></span>
+        <span class="query_activities glyphicon glyphicon-refresh"></span>
         <span class="loader"><img src="img/loader.gif" width="16px" height="16px" alt="" /></span>
-        <a href="<%= contributions_url %>" target="_blank">
-          <% if (contribution_summary.summary.commits == 0) { %>
-            <span class="badge">&middot;</span>
-          <% } else {
-            kinds = {'additions': '+', 'deletions': '-', 'commits': 'c'}
-            for (var kind in kinds) {
-              if (contribution_summary.summary[kind]) {
-                title = ''
-                for (var i = 0; i < contribution_summary.ordered_logins[kind].length; ++i) {
-                  login = contribution_summary.ordered_logins[kind][i]
-                  if (contribution_summary.by_login[login][kind]) {
-                    if (title != '') {
-                      title += '\n'
-                    }
-                    title += login + ': ' + contribution_summary.by_login[login][kind]
-                  }
-                } %>
-                <span class="badge badge-<%= kind %>" title="<%= title %>"><%= kinds[kind] %><%= contribution_summary.summary[kind] %></span>
-              <% }
-            }
-          } %>
-        </a>
+        <% if (!activity_summary.hasAnyActivity()) { %>
+          <span class="badge">&middot;</span>
+        <% } else if (!matched_activity_summary.hasAnyActivity()) { %>
+          <span class="badge badge-queried">&middot;</span>
+        <% } else {
+          if (matched_activity_summary.hasIssueActivity()) { %>
+            <span class="badge badge-issues" title="Issues">i
+              <span title="Issues opened"><%= matched_activity_summary.issues_opened %></span> |
+              <span title="Issues closed"><%= matched_activity_summary.issues_closed %></span> |
+              <span title="Issues comments"><%= matched_activity_summary.issue_comments %></span>
+            </span>
+          <% }
+          if (matched_activity_summary.hasPullRequestActivity()) { %>
+            <span class="badge badge-pull-requests" title="Pull requests">pr
+              <span title="PR opened"><%= matched_activity_summary.pull_requests_opened %></span> |
+              <span title="PR closed"><%= matched_activity_summary.pull_requests_closed %></span> |
+              <span title="PR comments"><%= matched_activity_summary.pull_request_comments %></span>
+            </span>
+          <% }
+          if (matched_activity_summary.tags) { %>
+            <span class="badge badge-tags" title="Tags">t <%= matched_activity_summary.tags %></span>
+          <% }
+          if (matched_activity_summary.commits) { %>
+            <span class="badge badge-commits" title="Commits">c <%= matched_activity_summary.commits %></span>
+          <% }
+        } %>
       </span>
       <span class="glyphicon glyphicon-folder-close"></span><span class="glyphicon glyphicon-folder-open"></span>
       <a href="<%= repo_url %>" target="_blank"><%- name %></a>
@@ -211,18 +219,21 @@
       <div class="clearfix"></div>
     </script>
 
-    <script id="contribution-template" type="text/template">
-      <span class="label label-default">W<%= timestamp.getWeek() %> <%= timestamp.getFullYear() %></span>
-      <%= login %>
+    <script id="activity-template" type="text/template">
+      <span class="label label-default" title="<%= timestamp %>">W<%= timestamp.getWeek() %> <%= timestamp.getFullYear() %></span>
+      <a href="<%= url %>" target="_blank"><%= text.length > 30 ? (text.substr(0, 30) + '...') : text %></a>
       <span class="actions">
-        <% if (additions) { %>
-          <span class="badge badge-additions">+<%= additions %></span>
+        <% if (issues_opened || issues_closed || issue_comments) { %>
+          <span class="badge badge-issues" title="Issues">i <%= issues_opened %> | <%= issues_closed %> | <%= issue_comments %></span>
         <% } %>
-        <% if (deletions) { %>
-          <span class="badge badge-deletions">-<%= deletions %></span>
+        <% if (pull_requests_opened || pull_requests_closed || pull_request_comments) { %>
+          <span class="badge badge-pull-requests" title="Pull requests">pr <%= pull_requests_opened %> | <%= pull_requests_closed %> | <%= pull_request_comments %></span>
+        <% } %>
+        <% if (tags) { %>
+          <span class="badge badge-tags" title="Tags">t <%= tags %></span>
         <% } %>
         <% if (commits) { %>
-          <span class="badge badge-commits">c<%= commits %></span>
+          <span class="badge badge-commits" title="Commits">c <%= commits %></span>
         <% } %>
       </span>
     </script>
@@ -235,7 +246,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-url/1.8.4/url.min.js"></script>
 
     <script src="js/base64_encode.js"></script>
-    <script src="js/statistics_dashboard.js"></script>
+    <script src="js/activities_dashboard.js"></script>
 
     <script src="js/github.js"></script>
     <script src="js/github_provider.js"></script>

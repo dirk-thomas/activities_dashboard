@@ -1,28 +1,34 @@
 /**
- * Statistics dashboard visualizes contributions
+ * Activities dashboard visualizes activities
  * from various platforms in a single user interface.
  *
  * Copyright (c) 2013-2015, Dirk Thomas
  * Distributed under the BSD 2-Clause license
- * https://github.com/dirk-thomas/statistics_dashboard/
+ * https://github.com/dirk-thomas/activities_dashboard/
  **/
 
 (function(namespace) {
 
   /*
-   * A contribution model has the following attributes:
-   * - login
+   * An activity model has the following attributes:
    * - timestamp
-   * - additions
-   * - deletions
+   * - issues_opened
+   * - issues_closed
+   * - issue_comments
+   * - pull_requests_opened
+   * - pull_requests_closed
+   * - pull_request_comments
+   * - tags
    * - commits
-   *   matches_filter (populated by the ContributionView)
+   * - text
+   * - url
+   *   matches_filter (populated by the ActivityView)
    */
-  namespace.ContributionModel = Backbone.Model.extend({
+  namespace.ActivityModel = Backbone.Model.extend({
   });
 
-  namespace.ContributionCollection = Backbone.Collection.extend({
-    model: namespace.ContributionModel,
+  namespace.ActivityCollection = Backbone.Collection.extend({
+    model: namespace.ActivityModel,
     // plain attribute comparator fails to order descending:
     /*comparator: function(model) {
       return - model.get('timestamp');
@@ -33,11 +39,6 @@
       // inverted order
       if (ts_a < ts_b) return 1;
       if (ts_a > ts_b) return -1;
-
-      login_a = a.get('login');
-      login_b = b.get('login');
-      if (login_a < login_b) return -1;
-      if (login_a > login_b) return 1;
       return 0;
     },
     set: function(models, options) {
@@ -46,41 +47,42 @@
     },
   });
 
-  namespace.ContributionView = Backbone.View.extend({
+  namespace.ActivityView = Backbone.View.extend({
     tagName: 'div',
-    className: 'contribution',
-    template: _.template($('#contribution-template').html()),
+    className: 'activity',
+    template: _.template($('#activity-template').html()),
     initialize: function(options) {
-      console.debug('ContributionView.initialize() contribution ' + this.model.get('timestamp') + ':' + this.model.get('login'));
+      console.debug('ActivityView.initialize() activity ' + this.model.get('timestamp'));
       this._filter_model = options.filter_model;
       this.listenTo(this.model, 'change', this.render);
       this.listenTo(this.model, 'destroy', this.remove);
+      this.listenTo(this._filter_model, 'change:age', this.update_filter_match);
       this.update_filter_match();
     },
     render: function() {
-      console.debug('ContributionView.render() contribution ' + this.model.get('timestamp') + ':' + this.model.get('login'));
+      console.debug('ActivityView.render() activity ' + this.model.get('timestamp'));
       this.$el.html(this.template(this.model.toJSON()));
       return this;
     },
     update_filter_match: function() {
-      console.debug('ContributionView.update_filter_match()');
+      console.debug('ActivityView.update_filter_match()');
       var old_matches_filter = this.model.get('matches_filter');
-      var matches_filter = this._filter_model.match_contribution(this.model);
+      var matches_filter = this._filter_model.match_activity(this.model);
       if (matches_filter) {
         this.$el.show();
       } else {
         this.$el.hide();
       }
-      console.debug('ContributionView.update_filter_match() ' + matches_filter);
+      console.debug('ActivityView.update_filter_match() ' + matches_filter);
       this.model.set({matches_filter: matches_filter});
     },
   });
 
-  namespace.ContributionListView = Backbone.View.extend({
+  namespace.ActivityListView = Backbone.View.extend({
     tagName: 'div',
-    className: 'contributionlist',
+    className: 'activitylist',
     initialize: function(options) {
-      console.debug('ContributionListView.initialize()');
+      console.debug('ActivityListView.initialize()');
       this._filter_model = options.filter_model;
       this.listenTo(this.collection, 'add', this.addOne);
       this.listenTo(this.collection, 'reset', this.addAll);
@@ -88,105 +90,115 @@
       this.listenTo(this.collection, 'sort', this.render);
     },
     render: function() {
-      console.debug('ContributionListView.render()');
+      console.debug('ActivityListView.render()');
       return this;
     },
     addOne: function(model) {
-      var view = new namespace.ContributionView({
+      var view = new namespace.ActivityView({
         model: model,
         filter_model: this._filter_model,
       });
       var index = this.collection.indexOf(model);
       var view_at_index = this._get_element_of_index(index);
       if (view_at_index.length) {
-        console.debug('ContributionListView.addOne() contribution ' + model.get('timestamp') + ':' + model.get('login') + ' at index ' + index.toString());
+        console.debug('ActivityListView.addOne() activity ' + model.get('timestamp') + ' at index ' + index.toString());
         view_at_index.before(view.render().el);
       } else {
-        console.debug('ContributionListView.addOne() contribution ' + model.get('timestamp') + ':' + model.get('login') + ' at the end');
+        console.debug('ActivityListView.addOne() activity ' + model.get('timestamp') + ' at the end');
         this.$el.append(view.render().el);
       }
     },
     addAll: function() {
-      console.debug('ContributionListView.addAll()');
+      console.debug('ActivityListView.addAll()');
       this.$el.html('');
       this.collection.each(this.addOne, this);
       this.collection.sort();
     },
     removeOne: function(model, collection, options) {
-      console.debug('ContributionListView.removeOne() contribution ' + model.get('timestamp') + ':' + model.get('login'));
+      console.debug('ActivityListView.removeOne() activity ' + model.get('timestamp'));
       this._get_element_of_index(options.index).remove();
     },
     _get_element_of_index: function (index) {
-      // in order for this to work the list of contributions added with collection.set(contributions)
+      // in order for this to work the list of activities added with collection.set(activities)
       // must in the correct order, meaning newest to oldest
-      return this.$('>' + namespace.ContributionView.prototype.tagName + ':eq(' + index.toString() + ')');
+      return this.$('>' + namespace.ActivityView.prototype.tagName + ':eq(' + index.toString() + ')');
     }
   });
 
 
-  namespace.ContributionCount = function() {
-    this.additions = 0;
-    this.deletions = 0;
+  namespace.ActivitySummary = function() {
+    this.issues_opened = 0;
+    this.issues_closed = 0;
+    this.issue_comments = 0;
+    this.pull_requests_opened = 0;
+    this.pull_requests_closed = 0;
+    this.pull_request_comments = 0;
+    this.tags = 0;
     this.commits = 0;
-    this.addContributionCount = function(count) {
-      this.additions += count.additions;
-      this.deletions += count.deletions;
-      this.commits += count.commits;
+    this.hasAnyActivity = function() {
+      return this.hasIssueActivity() || this.hasPullRequestActivity() || this.tags > 0 || this.commits > 0;
     };
-    this.addContributionModel = function(model) {
-      this.additions += model.get('additions');
-      this.deletions += model.get('deletions');
+    this.hasIssueActivity = function() {
+      return this.issues_opened > 0 || this.issues_closed > 0 || this.issue_comments > 0;
+    };
+    this.hasPullRequestActivity = function() {
+      return this.pull_requests_opened > 0 || this.pull_requests_closed > 0 || this.pull_request_comments > 0;
+    };
+    this.addActivityModel = function(model) {
+      this.issues_opened += model.get('issues_opened');
+      this.issues_closed += model.get('issues_closed');
+      this.issue_comments += model.get('issue_comments');
+      this.pull_requests_opened += model.get('pull_requests_opened');
+      this.pull_requests_closed += model.get('pull_requests_closed');
+      this.pull_request_comments += model.get('pull_request_comments');
+      this.tags += model.get('tags');
       this.commits += model.get('commits');
     };
-    this.reset = function() {
-      this.additions = 0;
-      this.deletions = 0;
-      this.commits = 0;
+    this.removeActivityModel = function(model) {
+      this.issues_opened -= model.get('issues_opened');
+      this.issues_closed -= model.get('issues_closed');
+      this.issue_comments -= model.get('issue_comments');
+      this.pull_requests_opened -= model.get('pull_requests_opened');
+      this.pull_requests_closed -= model.get('pull_requests_closed');
+      this.pull_request_comments -= model.get('pull_request_comments');
+      this.tags -= model.get('tags');
+      this.commits -= model.get('commits');
     };
-  };
-
-  namespace.ContributionSummary = function() {
-    this.summary = new namespace.ContributionCount();
-    this.by_login = {};
-    this.ordered_logins = {'additions': [], 'deletions': [], 'commits': []};
-    this.addContributionModel = function(model) {
-      this.summary.addContributionModel(model);
-      if (!(model.get('login') in this.by_login)) {
-        this.by_login[model.get('login')] = new namespace.ContributionCount();
-      }
-      this.by_login[model.get('login')].addContributionModel(model);
-    };
-    this.addContributionSummary = function(summary) {
+    this.addActivitySummary = function(summary) {
       if (!summary) {
         return;
       }
-      this.summary.addContributionCount(summary.summary);
-      for (var login in summary.by_login) {
-        if (!(login in this.by_login)) {
-          this.by_login[login] = new namespace.ContributionCount();
-        }
-        this.by_login[login].addContributionCount(summary.by_login[login]);
-      }
+      this.issues_opened += summary.issues_opened;
+      this.issues_closed += summary.issues_closed;
+      this.issue_comments += summary.issue_comments;
+      this.pull_requests_opened += summary.pull_requests_opened;
+      this.pull_requests_closed += summary.pull_requests_closed;
+      this.pull_request_comments += summary.pull_request_comments;
+      this.tags += summary.tags;
+      this.commits += summary.commits;
     };
-    this.updateLoginOrder = function() {
-      // order the logins by descending contribution count for each separate kind
-      for (var kind in this.ordered_logins) {
-        var counts = {};
-        for (var login in this.by_login) {
-          counts[login] = this.by_login[login][kind];
-        }
-        this.ordered_logins[kind] = Object.keys(counts).sort(function(a, b) {
-          if (counts[a] != counts[b]) {
-            return counts[b] - counts[a];
-          }
-          return a < b ? -1 : a > b;
-        });
+    this.removeActivitySummary = function(summary) {
+      if (!summary) {
+        return;
       }
+      this.issues_opened -= summary.issues_opened;
+      this.issues_closed -= summary.issues_closed;
+      this.issue_comments -= summary.issue_comments;
+      this.pull_requests_opened -= summary.pull_requests_opened;
+      this.pull_requests_closed -= summary.pull_requests_closed;
+      this.pull_request_comments -= summary.pull_request_comments;
+      this.tags -= summary.tags;
+      this.commits -= summary.commits;
     };
     this.reset = function() {
-      this.summary.reset();
-      this.by_login = {};
-      this.ordered_logins = {'additions': [], 'deletions': [], 'commits': []};
+      this.issues_opened = 0;
+      this.issues_closed = 0;
+      this.issue_comments = 0;
+      this.pull_requests_opened = 0;
+      this.pull_requests_closed = 0;
+      this.pull_request_comments = 0;
+      this.tags = 0;
+      this.commits = 0;
     };
   };
 
@@ -197,10 +209,9 @@
    * - name
    * - full_name
    * - repo_url
-   * - contributions_url
    * - is_starred
-   * - contribution_summary (populated by the RepositoryView, aggregated from the collection of ContributionModels)
-   * - matched_contribution_summary (populated by the RepositoryView, aggregated from the collection of ContributionModels)
+   * - activity_summary (populated by the RepositoryView, aggregated from the collection of ActivityModels)
+   * - matched_activity_summary (populated by the RepositoryView, aggregated from the collection of ActivityModels)
    *   matches_filter (populated by the RepositoryView)
    */
   namespace.RepositoryModel = Backbone.Model.extend({
@@ -219,29 +230,29 @@
     template: _.template($('#repo-header-template').html()),
     events: {
       'click a': 'skip_event',
-      'click .repo_header': 'toggle_contributionlist',
-      'click .reset_contributions': 'reset_contributions',
-      'click .query_contributions': 'query_contributions',
-      'click .compute_contributions': 'query_contributions',
+      'click .repo_header': 'toggle_activitylist',
+      'click .reset_activities': 'reset_activities',
+      'click .query_activities': 'query_activities',
     },
     initialize: function(options) {
       console.debug('RepositoryView.initialize() full_name: ' + this.model.get('full_name'));
       this._filter_model = options.filter_model;
-      this._query_contributors_stats = options.query_contributors_stats;
+      this._query_activities = options.query_activities;
       this.$el.html('<div class="repo_header"></div>');
       this.listenTo(this.model, 'change', this.render);
       this.listenTo(this.model, 'change:is_starred', this.update_filter_match);
       this.listenTo(this.model, 'destroy', this.remove);
       this.listenTo(this._filter_model, 'change:starred', this.update_filter_match);
-      this.contributions_queried = false;
-      this.contributionlist_folded = true;
+      this.activities_queried = false;
+      this.activitylist_folded = true;
 
-      this.contribution_collection = new namespace.ContributionCollection();
-      this.listenTo(this.contribution_collection, 'add', this.contribution_collection_changed);
-      this.listenTo(this.contribution_collection, 'remove', this.contribution_collection_changed);
-      this.listenTo(this.contribution_collection, 'reset', this.contribution_collection_changed);
-      var view = new namespace.ContributionListView({
-        collection: this.contribution_collection,
+      this.activity_collection = new namespace.ActivityCollection();
+      this.listenTo(this.activity_collection, 'add', this.activity_collection_changed);
+      this.listenTo(this.activity_collection, 'remove', this.activity_collection_changed);
+      this.listenTo(this.activity_collection, 'reset', this.activity_collection_changed);
+      this.listenTo(this.activity_collection, 'change:matches_filter', this.change_matches_filter);
+      var view = new namespace.ActivityListView({
+        collection: this.activity_collection,
         filter_model: this._filter_model,
       });
       this.$el.append(view.render().el);
@@ -251,25 +262,31 @@
       console.debug('RepositoryView.render() full_name: ' + this.model.get('full_name'));
       // can't use a default value in order to not overwrite values
       // when models are updated with new models from the provider
-      var missing = !this.model.has('contribution_summary');
+      var missing = !this.model.has('activity_summary');
       if (missing) {
         this.model.set({
-          contribution_summary: new namespace.ContributionSummary(),
-          matched_contribution_summary: new namespace.ContributionSummary()}, {silent: true});
+          activity_summary: new namespace.ActivitySummary()}, {silent: true});
+      }
+      var matched_missing = !this.model.has('matched_activity_summary');
+      if (matched_missing) {
+        this.model.set({
+          matched_activity_summary: new namespace.ActivitySummary()}, {silent: true});
       }
       this.$('.repo_header').html(this.template(this.model.toJSON()));
       if (missing) {
-        this.model.unset('contribution_summary', {silent: true});
-        this.model.unset('matched_contribution_summary', {silent: true});
+        this.model.unset('activity_summary', {silent: true});
+      }
+      if (matched_missing) {
+        this.model.unset('matched_activity_summary', {silent: true});
       }
 
       this.$('.repo_header .loader').hide();
-      if (this.contributionlist_folded) {
+      if (this.activitylist_folded) {
         this.$('.glyphicon-folder-open').hide();
-        this.$('.contributionlist').hide();
+        this.$('.activitylist').hide();
       } else {
         this.$('.glyphicon-folder-close').hide();
-        this.$('.contributionlist').show();
+        this.$('.activitylist').show();
       }
       return this;
     },
@@ -288,102 +305,110 @@
     skip_event: function(event) {
       event.stopPropagation();
     },
-    toggle_contributionlist: function() {
-      console.log('RepositoryView.toggle_contributionlist() full_name: ' + this.model.get('full_name'));
-      if (!this.contributions_queried) {
-        this.query_contributions();
-      } else if (this.contributionlist_folded) {
-        this.show_contributions();
+    toggle_activitylist: function() {
+      console.log('RepositoryView.toggle_activitylist() full_name: ' + this.model.get('full_name'));
+      if (!this.activities_queried) {
+        this.query_activities();
+      } else if (this.activitylist_folded) {
+        this.show_activities();
       } else {
-        this.hide_contributions();
+        this.hide_activities();
       }
     },
-    reset_contributions: function(event) {
-      console.log('RepositoryView.reset_contributions() full_name: ' + this.model.get('full_name'));
+    reset_activities: function(event) {
+      console.log('RepositoryView.reset_activities() full_name: ' + this.model.get('full_name'));
       if (event) {
         event.stopPropagation();
       }
-      this.contributions_queried = false;
-      this.$('.repo_header .reset_contributions').css('visibility', 'hidden');
-      this.model.unset('contribution_summary');
-      this.model.unset('matched_contribution_summary');
-      this.hide_contributions();
+      this.activities_queried = false;
+      this.$('.repo_header .reset_activities').css('visibility', 'hidden');
+      this.model.unset('activity_summary');
+      this.model.unset('matched_activity_summary');
+      this.hide_activities();
     },
-    query_contributions: function(event) {
-      console.log('RepositoryView.query_contributions() full_name: ' + this.model.get('full_name'));
+    query_activities: function(event) {
+      console.log('RepositoryView.query_activities() full_name: ' + this.model.get('full_name'));
       if (event) {
         event.stopPropagation();
       }
-      this.$('.repo_header .query_contributions').hide();
-      this.$('.repo_header .compute_contributions').hide();
+      this.$('.repo_header .query_activities').hide();
       this.$('.repo_header .loader').show();
-      this._query_contributors_stats(this.model, this.contribution_collection, $.proxy(this.query_contributions_completed, this));
+      this._query_activities(this.model, this.activity_collection, $.proxy(this.query_activities_completed, this));
     },
-    query_contributions_completed: function(loaded) {
-      console.log('RepositoryView.query_contributions_completed() loaded: ' + loaded);
-      this.$('.repo_header .query_contributions').css('display', '');
+    query_activities_completed: function(loaded) {
+      console.log('RepositoryView.query_activities_completed() loaded: ' + loaded);
+      this.$('.repo_header .query_activities').css('display', '');
       this.$('.repo_header .loader').hide();
-      if (loaded === false) {
-        this.$('.repo_header .compute_contributions').show();
-      }
       if (loaded === true) {
-        this.$('.repo_header .reset_contributions').css('visibility', 'visible');
-        if (!this.contributions_queried) {
-          //this.show_contributions();
-          this.contributions_queried = true;
-          if (!this.contribution_collection.length) {
-            // manually trigger model update when no contributions are found
-            this.contribution_collection_changed();
+        this.$('.repo_header .reset_activities').css('visibility', 'visible');
+        if (!this.activities_queried) {
+          //this.show_activities();
+          this.activities_queried = true;
+          if (!this.activity_collection.length) {
+            // manually trigger model update when no activities are found
+            this.activity_collection_changed();
           }
         }
       }
     },
-    show_contributions: function() {
-      console.debug('RepositoryView.show_contributions() full_name: ' + this.model.get('full_name'));
+    show_activities: function() {
+      console.debug('RepositoryView.show_activities() full_name: ' + this.model.get('full_name'));
       this.$('.glyphicon-folder-close').hide();
       this.$('.glyphicon-folder-open').show();
-      if (this.contribution_collection.length > 0) {
-        this.$('.contributionlist').show();
-        var height = this.$('.contributionlist').css('height', 'auto').css('height');
-        this.$('.contributionlist').css('height', 0);
-        var contributionlist = this.$('.contributionlist');
-        this.$('.contributionlist').animate({'height': height + 'px'}, {speed: 200, queue: false, always: function(){
-          contributionlist.css('height', 'auto');
+      if (this.activity_collection.length > 0) {
+        this.$('.activitylist').show();
+        var height = this.$('.activitylist').css('height', 'auto').css('height');
+        this.$('.activitylist').css('height', 0);
+        var activitylist = this.$('.activitylist');
+        this.$('.activitylist').animate({'height': height + 'px'}, {speed: 200, queue: false, always: function(){
+          activitylist.css('height', 'auto');
         }});
       }
-      this.contributionlist_folded = false;
+      this.activitylist_folded = false;
     },
-    hide_contributions: function() {
-      console.debug('RepositoryView.hide_contributions() full_name: ' + this.model.get('full_name'));
+    hide_activities: function() {
+      console.debug('RepositoryView.hide_activities() full_name: ' + this.model.get('full_name'));
       this.$('.glyphicon-folder-close').show();
       this.$('.glyphicon-folder-open').hide();
-      var contributionlist = this.$('.contributionlist');
-      this.$('.contributionlist').animate({'height': '0px'}, {speed: 200, queue: false, always: function(){
-        contributionlist.hide();
+      var activitylist = this.$('.activitylist');
+      this.$('.activitylist').animate({'height': '0px'}, {speed: 200, queue: false, always: function(){
+        activitylist.hide();
       }});
-      this.contributionlist_folded = true;
+      this.activitylist_folded = true;
     },
-    contribution_collection_changed: function() {
-      console.debug('RepositoryView.contribution_collection_changed() full_name: ' + this.model.get('full_name'));
-      var summary = new namespace.ContributionSummary();
-      this.contribution_collection.each(function(contribution_model, index) {
-        summary.addContributionModel(contribution_model);
+    activity_collection_changed: function() {
+      console.debug('RepositoryView.activity_collection_changed() full_name: ' + this.model.get('full_name'));
+      var summary = new namespace.ActivitySummary();
+      this.activity_collection.each(function(activity_model, index) {
+        summary.addActivityModel(activity_model);
       });
-      summary.updateLoginOrder();
-      this.model.set({'contribution_summary': summary});
-      this.update_matched_contribution_summary();
+      this.model.set({'activity_summary': summary});
+      this.update_matched_activity_summary();
     },
-    update_matched_contribution_summary: function() {
-      console.debug('RepositoryView.update_matched_contribution_summary() full_name: ' + this.model.get('full_name'));
-      var summary = new namespace.ContributionSummary();
-      this.contribution_collection.each(function(contribution_model, index) {
-        if (contribution_model.get('matches_filter')) {
-          summary.addContributionModel(contribution_model);
+    update_matched_activity_summary: function() {
+      console.debug('RepositoryView.update_matched_activity_summary() full_name: ' + this.model.get('full_name'));
+      var summary = new namespace.ActivitySummary();
+      this.activity_collection.each(function(activity_model, index) {
+        if (activity_model.get('matches_filter')) {
+          summary.addActivityModel(activity_model);
         }
       });
-      summary.updateLoginOrder();
-      console.debug('RepositoryView.update_matched_contribution_summary() full_name: ' + this.model.get('full_name') + ' ' + summary);
-      this.model.set({matched_contribution_summary: summary});
+      console.debug('RepositoryView.update_matched_activity_summary() full_name: ' + this.model.get('full_name') + ' ' + summary);
+      this.model.set({matched_activity_summary: summary});
+    },
+    change_matches_filter: function(activity_model) {
+      console.debug('RepositoryView.change_matches_filter() full_name: ' + this.model.get('full_name') + ' activity: ' + activity_model.get('text').substr(0, 30));
+      var summary = new namespace.ActivitySummary();
+      summary.addActivitySummary(this.model.get('matched_activity_summary'));
+      if (activity_model.get('matches_filter')) {
+        console.debug('RepositoryView.change_matches_filter() full_name: ' + this.model.get('full_name') + ' add activity: ' + activity_model.get('text').substr(0, 30));
+        summary.addActivityModel(activity_model);
+        this.model.set({matched_activity_summary: summary});
+      } else if (!activity_model.get('matches_filter') && activity_model.previous('matches_filter')) {
+        console.debug('RepositoryView.change_matches_filter() full_name: ' + this.model.get('full_name') + ' remove activity: ' + activity_model.get('text').substr(0, 30));
+        summary.removeActivityModel(activity_model);
+        this.model.set({matched_activity_summary: summary});
+      }
     },
   });
 
@@ -393,7 +418,7 @@
     initialize: function(options) {
       console.debug('RepositoryListView.initialize()');
       this._filter_model = options.filter_model;
-      this._query_contributors_stats = options.query_contributors_stats;
+      this._query_activities = options.query_activities;
       this.listenTo(this.collection, 'add', this.addOne);
       this.listenTo(this.collection, 'reset', this.addAll);
       this.listenTo(this.collection, 'remove', this.removeOne);
@@ -406,7 +431,7 @@
       var view = new namespace.RepositoryView({
         model: model,
         filter_model: this._filter_model,
-        query_contributors_stats: this._query_contributors_stats,
+        query_activities: this._query_activities,
       });
       var index = this.collection.indexOf(model);
       var view_at_index = this._get_element_of_index(index);
@@ -439,14 +464,12 @@
    * - name
    * - avatar_url
    * - starred_repos
-   * - contribution_summary (populated by the RepositoryViewGroupView, aggregated from the collection of RepositoryModels)
-   * - matched_contribution_summary (populated by the GroupView, aggregated from the collection of RepositoryModels)
+   * - matched_activity_summary (populated by the GroupView, aggregated from the collection of RepositoryModels)
    *   matches_filter (populated by the GroupView)
    */
   namespace.GroupModel = Backbone.Model.extend({
     defaults: {
-      'contribution_summary': new namespace.ContributionSummary(),
-      'matched_contribution_summary': new namespace.ContributionSummary(),
+      'matched_activity_summary': new namespace.ActivitySummary(),
     },
   });
 
@@ -470,7 +493,7 @@
       console.debug('GroupView.initialize() group: ' + this.model.get('name'));
       this._filter_model = options.filter_model;
       this._query_group_repos = options.query_group_repos;
-      this._query_contributors_stats = options.query_contributors_stats;
+      this._query_activities = options.query_activities;
       this.$el.html('<div class="group_header"></div>');
       this.listenTo(this.model, 'change', this.render);
       this.listenTo(this.model, 'change:starred_repos', this.update_filter_match);
@@ -483,12 +506,11 @@
       this.listenTo(this.repository_collection, 'add', this.add_repo);
       this.listenTo(this.repository_collection, 'remove', this.remove_repo);
       this.listenTo(this.repository_collection, 'reset', this.reset_repos);
-      this.listenTo(this.repository_collection, 'change:contribution_summary', this.update_contribution_summary);
-      this.listenTo(this.repository_collection, 'change:matched_contribution_summary', this.update_matched_contribution_summary);
+      this.listenTo(this.repository_collection, 'change:matched_activity_summary', this.update_matched_activity_summary);
       var view = new namespace.RepositoryListView({
         collection: this.repository_collection,
         filter_model: this._filter_model,
-        query_contributors_stats: this._query_contributors_stats,
+        query_activities: this._query_activities,
       });
       this.$el.append(view.render().el);
       this.update_filter_match();
@@ -513,7 +535,7 @@
       }
       console.debug('GroupView.update_filter_match() ' + matches_filter);
       this.model.set({matches_filter: matches_filter});
-      //this.update_open_issue_count();
+      this.update_matched_activity_summary();
     },
     skip_event: function(event) {
       event.stopPropagation();
@@ -567,8 +589,10 @@
       this.show_repos();
 
       if (this._filter_model.match_repo(repo_model)) {
-        //var count = repo_model.get('open_issue_count');
-        //this.model.set({open_issue_count: this.model.get('open_issue_count') + count});
+        var group_summary = this.model.get('matched_activity_summary')
+        var repo_summary = repo_model.get('matched_activity_summary');
+        group_summary.addActivitySummary(repo_summary);
+        this.model.set({matched_activity_summary: group_summary});
       }
     },
     remove_repo: function(repo_model) {
@@ -578,8 +602,10 @@
       }
 
       if (this._filter_model.match_repo(repo_model)) {
-        //var count = repo_model.get('open_issue_count');
-        //this.model.set({open_issue_count: this.model.get('open_issue_count') - count});
+        var group_summary = this.model.get('matched_activity_summary')
+        var repo_summary = repo_model.get('matched_activity_summary');
+        group_summary.removeActivitySummary(repo_summary);
+        this.model.set({matched_activity_summary: group_summary});
       }
     },
     reset_repos: function(repo_models) {
@@ -589,54 +615,30 @@
       } else {
         this.hide_repos();
       }
-      this.update_contribution_summary();
+      this.update_matched_activity_summary();
     },
-    update_contribution_summary: function() {
-      console.debug('GroupView.update_contribution_summary() group: ' + this.model.get('name'));
-      var summary = new namespace.ContributionSummary();
-      this.repository_collection.each(function(repo_model, index) {
-        summary.addContributionSummary(repo_model.get('contribution_summary'));
-      });
-      summary.updateLoginOrder();
-      this.model.set({'contribution_summary': summary});
-      this.update_matched_contribution_summary();
-    },
-    update_matched_contribution_summary: function(repo_model) {
-      console.debug('GroupView.update_matched_contribution_summary() group: ' + this.model.get('name'));
-      return;
-      var model_count = this.model.get('matched_issue_count');
-      var repo_model_previous_count = null;
+    update_matched_activity_summary: function(repo_model) {
+      console.debug('GroupView.update_matched_activity_summary() group: ' + this.model.get('name'));
+      var summary = this.model.get('matched_activity_summary');
+      var repo_model_previous_summary = null;
       if (repo_model) {
-        repo_model.previous('matched_issue_count');
+        repo_model.previous('matched_activity_summary');
       }
-      // can't use previous count since for multiple adds the previous value is the same value which would result in increasing offsets
+      // can't use previous summary since for multiple adds the previous value is the same value which would result in increasing offsets
       // therefore not using the offset at all but recompute the sum every time
-      if (false && model_count != null && repo_model_previous_count != null && typeof repo_model_previous_count != 'undefined') {
-        // update group model only by offset of repo model
-        if (this._filter_model.match_repo(repo_model)) {
-          var offset = repo_model.get('matched_issue_count') - repo_model_previous_count;
-          console.debug('GroupView.update_matched_contribution_summary() group: ' + this.model.get('name') + ' offset ' + offset);
-          this.model.set({matched_issue_count: model_count + offset});
-        }
-      } else {
-        // calculate sum of all repo models
-        var matched_issue_count = 0;
-        var filter_model = this._filter_model;
-        this.repository_collection.each(function(repo_model, index) {
-          if (filter_model.match_repo(repo_model)) {
-            var count = repo_model.get('matched_issue_count');
-            if (count != null) {
-              //console.debug('GroupView.update_matched_contribution_summary() repo ' + repo_model.get('full_name') + ' count ' + count);
-              matched_issue_count += count;
-            } else {
-              //console.debug('GroupView.update_matched_contribution_summary() repo ' + repo_model.get('full_name') + ' "null" ' + repo_model.get('open_issue_count'));
-              matched_issue_count += repo_model.get('open_issue_count');
-            }
+      var summary = new namespace.ActivitySummary();
+      var filter_model = this._filter_model;
+      this.repository_collection.each(function(repo_model, index) {
+        if (filter_model.match_repo(repo_model)) {
+          var repo_summary = repo_model.get('matched_activity_summary');
+          if (repo_summary != null) {
+            //console.debug('GroupView.update_matched_activity_summary() repo ' + repo_model.get('full_name'));
+            summary.addActivitySummary(repo_summary);
           }
-        });
-        //console.debug('GroupView.update_matched_contribution_summary() group: ' + this.model.get('name') + ' all ' + matched_issue_count);
-        this.model.set({matched_issue_count: matched_issue_count});
-      }
+        }
+      });
+      //console.debug('GroupView.update_matched_activity_summary() group: ' + this.model.get('name') + ' all');
+      this.model.set({matched_activity_summary: summary});
     },
     update_starred_repos: function() {
       console.debug('GroupView.update_starred_repos() group: ' + this.model.get('name'));
@@ -656,7 +658,7 @@
       this._filter_model = null;
       this._query_groups = options.query_groups;
       this._query_group_repos = options.query_group_repos;
-      this._query_contributors_stats = options.query_contributors_stats;
+      this._query_activities = options.query_activities;
       this.listenTo(this.collection, 'add', this.addOne);
       this.listenTo(this.collection, 'reset', this.addAll);
       this.listenTo(this.collection, 'remove', this.removeOne);
@@ -678,7 +680,7 @@
         model: model,
         filter_model: this._filter_model,
         query_group_repos: this._query_group_repos,
-        query_contributors_stats: this._query_contributors_stats,
+        query_activities: this._query_activities,
       });
       var index = this.collection.indexOf(model);
       var view_at_index = this._get_element_of_index(index);
@@ -708,10 +710,12 @@
   /*
    * A filter model has the following attributes:
    * - starred
+   * - age (in milliseconds)
    */
   namespace.FilterModel = Backbone.Model.extend({
     defaults: {
       'starred': false,
+      'age': 0,
     },
     match_group: function(group_model) {
       var starred = this.get('starred');
@@ -729,7 +733,15 @@
       console.log('FilterModel.match_repo() starred ' + repo_model.get('name'));
       return repo_model.get('is_starred');
     },
-    match_contribution: function(contribution_model) {
+    match_activity: function(activity_model) {
+      var age = this.get('age');
+      console.log('FilterModel.match_activity() age ' + age);
+      if (age != 0) {
+        if (Date.now() - age > activity_model.get('timestamp')) {
+          console.log('FilterModel.match_activity() filter by age ' + activity_model.get('text').substr(0, 30));
+          return false;
+        }
+      }
       return true;
     },
     persist: function() {
@@ -757,15 +769,20 @@
     },
     initialize: function() {
       console.debug('FilterView.initialize()');
-      this.$el.html(this.template(this.model.toJSON()));
+      this.$el.html(this.template(this._get_render_data()));
       this.listenTo(this.model, 'change', this.render);
       this.listenTo(this.model, 'change', this.persist);
       this.listenTo(this.model, 'destroy', this.remove);
     },
     render: function() {
       console.debug('FilterView.render()');
-      this.$('.filter').html(this.template(this.model.toJSON()));
+      this.$('.filter').html(this.template(this._get_render_data()));
       return this;
+    },
+    _get_render_data: function() {
+      var data = this.model.toJSON();
+      data['age_days'] = Math.round(Number(data['age']) / (24 * 60 * 60 * 1000));
+      return data;
     },
     persist: function() {
       this.model.persist();
@@ -776,6 +793,10 @@
         var checked = event.currentTarget.checked;
         console.debug('FilterView.change_filter() starred: ' + checked);
         this.model.set({starred: checked});
+      } else if (name == 'filter_age_days') {
+        var value = event.currentTarget.value;
+        console.debug('FilterView.change_filter() age days: ' + value);
+        this.model.set({age: value * 24 * 60 * 60 * 1000});
       } else {
         console.warn('FilterView.change_filter() unknown filter name: ' + name);
       }
@@ -784,13 +805,11 @@
 
   /*
    * A summary model has the following attributes:
-   * - contribution_summary
-   * - matched_contribution_summary
+   * - matched_activity_summary
    */
   namespace.SummaryModel = Backbone.Model.extend({
     defaults: {
-      'contribution_summary': new namespace.ContributionSummary(),
-      'matched_contribution_summary': new namespace.ContributionSummary(),
+      'matched_activity_summary': new namespace.ActivitySummary(),
     },
   });
 
@@ -818,7 +837,7 @@
     },
     addOne: function(group_model) {
       console.debug('SummaryView.addOne()');
-      this.listenTo(group_model, 'change:contribution_summary', this.update);
+      this.listenTo(group_model, 'change:matched_activity_summary', this.update);
       return this;
     },
     removeOne: function(model, collection, options) {
@@ -828,28 +847,26 @@
     },
     update: function() {
       console.debug('SummaryView.update()');
-      var summary = new namespace.ContributionSummary();
+      var matched_summary = new namespace.ActivitySummary();
       _(this.group_collections).each(function(group_collection) {
         console.debug('group_collection = ' + group_collection + ' ' + group_collection.length);
         group_collection.each(function(group_model, index) {
           console.debug('group_model = ' + group_model);
-          summary.addContributionSummary(group_model.get('contribution_summary'));
+          matched_summary.addActivitySummary(group_model.get('matched_activity_summary'));
         });
       });
-      summary.updateLoginOrder();
-      console.debug('summary: ' + summary.summary.additions + summary.summary.deletions + summary.summary.commits);
-      this.model.set({'contribution_summary': summary});
-      //this.update_matched_contribution_summary();
+      console.debug('matched_summary: ' + (matched_summary.issues_opened + matched_summary.issues_closed + matched_summary.issue_comments + matched_summary.pull_requests_opened + matched_summary.pull_requests_closed + matched_summary.pull_request_comments + matched_summary.tags + matched_summary.commits));
+      this.model.set({'matched_activity_summary': matched_summary});
     },
   });
 
 
-  namespace.StatisticsDashboardView = Backbone.View.extend({
+  namespace.ActivitiesDashboardView = Backbone.View.extend({
     tagName: 'div',
-    className: 'statistics_dashboard',
-    template: _.template($('#statistics-dashboard').html()),
+    className: 'activities_dashboard',
+    template: _.template($('#activities-dashboard').html()),
     initialize: function() {
-      console.debug('StatisticsDashboardView.initialize()');
+      console.debug('ActivitiesDashboardView.initialize()');
       this.$el.html(this.template());
 
       this._summary_model = new namespace.SummaryModel();
@@ -863,15 +880,15 @@
       this._providers = [];
     },
     render: function() {
-      console.debug('StatisticsDashboardView.render()');
+      console.debug('ActivitiesDashboardView.render()');
       return this;
     },
     get_filter_model: function() {
-      console.debug('StatisticsDashboardView.get_filter_model()');
+      console.debug('ActivitiesDashboardView.get_filter_model()');
       return this._filter_model;
     },
     add_provider: function(provider) {
-      console.log('StatisticsDashboardView.add_provider() ' + provider.get_name());
+      console.log('ActivitiesDashboardView.add_provider() ' + provider.get_name());
       this.$('.provider_status').append(provider.get_status_view().render().el);
       this.$('.provider_login').append(provider.get_login_view().render().el);
       this.$('.provider_dashboard').append(provider.get_dashboard_view().render().el);
@@ -880,4 +897,4 @@
     },
   });
 
-})(window.statistics_dashboard = window.statistics_dashboard || {});
+})(window.activities_dashboard = window.activities_dashboard || {});

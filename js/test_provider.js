@@ -1,13 +1,13 @@
 /**
  * Provider generating test data
- * into the statistics dashboard.
+ * into the activities dashboard.
  *
  * Copyright (c) 2013-2015, Dirk Thomas
  * Distributed under the BSD 2-Clause license
- * https://github.com/dirk-thomas/statistics_dashboard/
+ * https://github.com/dirk-thomas/activities_dashboard/
  **/
 
-(function(namespace, statistics_dashboard_namespace) {
+(function(namespace, activities_dashboard_namespace) {
 
   namespace.TestModel = Backbone.Model.extend({
     initialize: function() {
@@ -86,8 +86,8 @@
       'click .remove_group_button': 'decrement_groups',
       'click .add_repo_button': 'increment_repos',
       'click .remove_repo_button': 'decrement_repos',
-      'click .add_contribution_button': 'increment_contributions',
-      'click .remove_contribution_button': 'decrement_contributions',
+      'click .add_activity_button': 'increment_activities',
+      'click .remove_activity_button': 'decrement_activities',
       'click .login_button': 'login',
       'click .logout_button': 'logout',
       'click .query_groups': 'refresh_groups',
@@ -111,8 +111,8 @@
         var tmpl = _.template($("#test-status-logged-in").html());
         var groups = this.test_model.get('groups');
         var repos = this.test_model.get('repos');
-        var contributions = this.test_model.get('contributions');
-        this.$el.html(tmpl({groups: groups, repos: repos, contributions: contributions}));
+        var activities = this.test_model.get('activities');
+        this.$el.html(tmpl({groups: groups, repos: repos, activities: activities}));
       }
       return this;
     },
@@ -140,16 +140,16 @@
         this.test_model.set({repos: repos - 1});
       }
     },
-    increment_contributions: function() {
-      console.debug('StatusView.increment_statistics()');
-      var statistics = this.test_model.get('statistics');
-      this.test_model.set({statistics: statistics + 1});
+    increment_activities: function() {
+      console.debug('StatusView.increment_activities()');
+      var activities = this.test_model.get('activities');
+      this.test_model.set({activities: activities + 1});
     },
-    decrement_statistics: function() {
-      console.debug('StatusView.decrement_statistics()');
-      var statistics = this.test_model.get('statistics');
-      if (statistics > 0) {
-        this.test_model.set({statistics: statistics - 1});
+    decrement_activities: function() {
+      console.debug('StatusView.decrement_activities()');
+      var activities = this.test_model.get('activities');
+      if (activities > 0) {
+        this.test_model.set({activities: activities - 1});
       }
     },
     login: function(event) {
@@ -190,7 +190,7 @@
               data['starred_repos'].push('R' + j)
             }
           }
-          models.push(new statistics_dashboard_namespace.GroupModel(data));
+          models.push(new activities_dashboard_namespace.GroupModel(data));
         }
         group_collection.set(models);
       }
@@ -205,10 +205,9 @@
             name: 'R' + i,
             full_name: 'R' + i,
             repo_url: '',
-            contributions_url: '',
             is_starred: i % 3 == 0,
           };
-          models.push(new statistics_dashboard_namespace.RepositoryModel(data));
+          models.push(new activities_dashboard_namespace.RepositoryModel(data));
         }
         setTimeout(function(){
           repository_collection.set(models);
@@ -218,11 +217,11 @@
         }, 250);
       }
 
-      function _query_repo_contributions(model, contribution_collection, complete_callback) {
-        console.debug('_query_repo_contributions()');
+      function _query_repo_activities(model, activity_collection, complete_callback) {
+        console.debug('_query_repo_activities()');
         var models = [];
-        for (var i = self.test_model.get('contributions'); i > 0; i--) {
-          console.debug('query_repos() add contribution');
+        for (var i = self.test_model.get('activities'); i > 0; i--) {
+          console.debug('query_repos() add activity');
           var data = {
             id: 'I' + i,
             number: i,
@@ -235,22 +234,22 @@
             updated_at: i,
             labels: [],
           };
-          models.push(new statistics_dashboard_namespace.ContributionModel(data));
+          models.push(new activities_dashboard_namespace.ActivityModel(data));
         }
         setTimeout(function(){
-          contribution_collection.set(models);
+          activity_collection.set(models);
           if (complete_callback) {
             complete_callback();
           }
         }, 250);
       }
 
-      this.group_collection = new statistics_dashboard_namespace.GroupCollection();
-      this.group_list_view = new statistics_dashboard_namespace.GroupListView({
+      this.group_collection = new activities_dashboard_namespace.GroupCollection();
+      this.group_list_view = new activities_dashboard_namespace.GroupListView({
         collection: this.group_collection,
         query_groups: _query_groups,
         query_group_repos: _query_group_repos,
-        query_repo_contributions: _query_repo_contributions,
+        query_repo_activities: _query_repo_activities,
       });
       this.$el.append(this.group_list_view.render().el);
 
@@ -281,7 +280,7 @@
 
 
   namespace.TestProvider = function() {
-    this.test_model = new namespace.TestModel({groups: 1, repos: 1, contributions: 1});
+    this.test_model = new namespace.TestModel({groups: 1, repos: 1, activities: 1});
     this.login_view = new namespace.LoginView(this.test_model);
     this.status_view = new namespace.StatusView(this.test_model, this.login_view);
     this.dashboard_view = new namespace.DashboardView(this.test_model);
@@ -308,4 +307,4 @@
     };
   };
 
-})(window.test_provider = window.test_provider || {}, window.statistics_dashboard);
+})(window.test_provider = window.test_provider || {}, window.activities_dashboard);

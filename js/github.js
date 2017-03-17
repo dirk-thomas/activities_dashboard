@@ -4,7 +4,7 @@
  *
  * Copyright (c) 2013-2015, Dirk Thomas
  * Distributed under the BSD 2-Clause license
- * https://github.com/dirk-thomas/statistics_dashboard/
+ * https://github.com/dirk-thomas/activities_dashboard/
  **/
 
 (function(namespace) {
@@ -50,17 +50,41 @@
     };
 
     // List repositories starred by the authentiticated user
-    // https://developer.github.com/v3/activity/starring/#list-repositories-being-starred
+    // https://developer.github.com/v3/activities/starring/#list-repositories-being-starred
     this.starredRepos = function(cb) {
       _get_all('/user/starred', function(err, res) {
         cb(err, res);
       });
     };
 
-    // List contributors statistics for the specified repository
-    // https://developer.github.com/v3/repos/statistics/#contributors
-    this.contributorsStats = function(full_name, cb) {
-      _get_all('/repos/' + full_name + '/stats/contributors', function(err, res) {
+    // List comments for the specified repository
+    // https://developer.github.com/v3/issues/comments/#list-comments-in-a-repository
+    this.comments = function(full_name, cb) {
+      _get_all('/repos/' + full_name + '/issues/comments', function(err, res) {
+        cb(err, res);
+      });
+    };
+
+    // List commits for the specified repository
+    // https://developer.github.com/v3/repos/commits/#list-commits-on-a-repository
+    this.commits = function(full_name, cb) {
+      _get_all('/repos/' + full_name + '/commits', function(err, res) {
+        cb(err, res);
+      });
+    };
+
+    // List issues for the specified repository
+    // https://developer.github.com/v3/issues/#list-issues-for-a-repository
+    this.issues = function(full_name, cb) {
+      _get_all('/repos/' + full_name + '/issues?state=all', function(err, res) {
+        cb(err, res);
+      });
+    };
+
+    // List tags for the specified repository
+    // https://developer.github.com/v3/repos/#list-tags
+    this.tags = function(full_name, cb) {
+      _get_all('/repos/' + full_name + '/tags', function(err, res) {
         cb(err, res);
       });
     };
@@ -103,7 +127,7 @@
 
       // require user agent
       // https://developer.github.com/v3/#user-agent-required
-      //xhr.setRequestHeader('User-Agent', 'https://github.com/dirk-thomas/statistics_dashboard/');
+      //xhr.setRequestHeader('User-Agent', 'https://github.com/dirk-thomas/activities_dashboard/');
 
       xhr.onreadystatechange = function () {
         if (this.readyState == 2) {

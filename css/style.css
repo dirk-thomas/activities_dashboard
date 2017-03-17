@@ -195,17 +195,16 @@ body {
 .repo_header .actions {
   float: right;
 }
-.repo_header .reset_contributions {
+.repo_header .reset_activities {
   margin-right: 5px;
   visibility: hidden;
 }
-.repo_header .reset_contributions,
-.repo_header .query_contributions,
-.repo_header .compute_contributions {
+.repo_header .reset_activities,
+.repo_header .query_activities {
   display: none;
 }
-.repo_header:hover .reset_contributions,
-.repo_header:hover .query_contributions {
+.repo_header:hover .reset_activities,
+.repo_header:hover .query_activities {
   display: initial;
 }
 .repo_header .badge {
@@ -215,28 +214,31 @@ body {
   background-color: #3a87ad;
 }
 
-.contributionlist {
+.activitylist {
   clear: both;
 }
-.contribution {
+.activity {
   border-top: 1px dotted #d7d7d7;;
   padding: 3px 10px 3px 30px;
 }
-.contribution:hover {
+.activity:hover {
   background-color: #e9e9f5;
 }
-.contribution .actions {
+.activity .actions {
   float: right;
 }
 
-.badge-additions {
+.badge-issues {
+  background-color: #f0ad4e;
+}
+.badge-pull-requests {
   background-color: #449d44;
 }
-.badge-deletions {
-  background-color: #c9302c;
+.badge-tags {
+  background-color: #337ab7;
 }
 .badge-commits {
-  background-color: #3a87ad;
+  background-color: #5bc0de;
 }
 
 .glyphicon-refresh:hover {

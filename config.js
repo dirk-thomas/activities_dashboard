@@ -5,7 +5,7 @@
     console.debug = function() {};
   }
 
-  var dashboard = new statistics_dashboard.StatisticsDashboardView();
+  var dashboard = new activities_dashboard.ActivitiesDashboardView();
   $('#main').append(dashboard.render().el);
 
   var github = new github_provider.GitHubProvider();

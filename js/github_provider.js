@@ -1,13 +1,13 @@
 /**
- * Provider incorporating GitHub contributions
- * into the statistics dashboard.
+ * Provider incorporating GitHub activities
+ * into the activities dashboard.
  *
  * Copyright (c) 2013-2015, Dirk Thomas
  * Distributed under the BSD 2-Clause license
- * https://github.com/dirk-thomas/statistics_dashboard/
+ * https://github.com/dirk-thomas/activities_dashboard/
  **/
 
-(function(namespace, github_namespace, statistics_dashboard_namespace) {
+(function(namespace, github_namespace, activities_dashboard_namespace) {
 
   namespace.GitHubModel = Backbone.Model.extend({
     initialize: function() {
@@ -163,39 +163,223 @@
   });
 
 
-  var query_contributors_stats = function(github, full_name, user, contribution_collection, complete_callback) {
-    console.debug('query_contributors_stats()');
-    github.contributorsStats(full_name, function(err, res) {
-      if (err) {
-        if (err.status != 202) {
-          console.error('query_contributors_stats() err code: ' + err);
-        } else {
-          console.debug('query_contributors_stats() computing repo stats');
-        }
+  var query_activities = function(github, full_name, activity_collection, complete_callback) {
+    console.debug('query_activities()');
+    var models = [];
+    query_comments(github, full_name, models, function(loaded) {
+      if (loaded !== true) {
         if (complete_callback) {
-          complete_callback(err.status == 202 ? false : null);
+          complete_callback(null);
         }
       } else {
-        var models = [];
-        _(res).each(function(user_contribution) {
-          console.debug('query_contributors_stats() for user: ' + user_contribution.author.login);
-          _(user_contribution.weeks).each(function(contribution) {
-            var date = new Date(contribution.w * 1000);
-            if (contribution.c) {
-              var data = {
-                login: user_contribution.author.login,
-                timestamp: date,
-                additions: contribution.a,
-                deletions: contribution.d,
-                commits: contribution.c,
-              };
-              //contribution_collection.add(new statistics_dashboard_namespace.ContributionModel(data), {merge: true});
-              console.debug(' - ' + contribution.a + ' ' + contribution.d + ' ' + contribution.c);
-              models.push(new statistics_dashboard_namespace.ContributionModel(data));
+        query_commits(github, full_name, models, function(loaded) {
+          if (loaded !== true) {
+            if (complete_callback) {
+              complete_callback(null);
             }
-          });
+          } else {
+            query_issues(github, full_name, models, function(loaded) {
+              if (loaded !== true) {
+                if (complete_callback) {
+                  complete_callback(null);
+                }
+              } else {
+                query_tags(github, full_name, models, function(loaded) {
+                  if (loaded !== true) {
+                    if (complete_callback) {
+                      complete_callback(null);
+                    }
+                  } else {
+                    // all activies loaded, update collection
+                    activity_collection.set(models);
+                    if (complete_callback) {
+                      complete_callback(true);
+                    }
+                  }
+                }, this);
+              }
+            }, this);
+          }
+        }, this);
+      }
+    }, this);
+  };
+
+  var query_comments = function(github, full_name, models, complete_callback) {
+    console.debug('query_comments()');
+
+    github.comments(full_name, function(err, res) {
+      if (err) {
+        console.error('query_comments() err code: ' + err);
+        if (complete_callback) {
+          complete_callback(null);
+        }
+      } else {
+        _(res).each(function(comment) {
+          console.debug('query_comments() comment: ' + comment.id);
+          var a = document.createElement('a');
+          a.href = comment.html_url;
+          path_parts = a.pathname.split('/');
+          is_issue_comment = false;
+          is_pull_request_comment = false;
+          if (path_parts.length == 5) {
+            if (path_parts[3] == 'issues') is_issue_comment = true;
+            if (path_parts[3] == 'pull') is_pull_request_comment = true;
+          }
+          var data = {
+            timestamp: new Date(comment.created_at),
+            issues_opened: 0,
+            issues_closed: 0,
+            issue_comments: is_issue_comment ? 1 : 0,
+            pull_requests_opened: 0,
+            pull_requests_closed: 0,
+            pull_request_comments: is_pull_request_comment ? 1 : 0,
+            tags: 0,
+            commits: 0,
+            text: 'Comment: ' + comment.body,
+            url: comment.html_url,
+          };
+          //activity_collection.add(new activities_dashboard_namespace.ActivityModel(data), {merge: true});
+          models.push(new activities_dashboard_namespace.ActivityModel(data));
         });
-        contribution_collection.set(models);
+        if (complete_callback) {
+          complete_callback(true);
+        }
+      }
+    }, this);
+  };
+
+  var query_commits = function(github, full_name, models, complete_callback) {
+    console.debug('query_commits()');
+
+    github.commits(full_name, function(err, res) {
+      if (err) {
+        console.error('query_commits() err code: ' + err);
+        if (complete_callback) {
+          complete_callback(null);
+        }
+      } else {
+        _(res).each(function(commit) {
+          console.debug('query_commits() commit: ' + commit.sha);
+          var data = {
+            timestamp: new Date(commit.commit.committer.date),
+            issues_opened: 0,
+            issues_closed: 0,
+            issue_comments: 0,
+            pull_requests_opened: 0,
+            pull_requests_closed: 0,
+            pull_request_comments: 0,
+            tags: 0,
+            commits: 1,
+            text: 'Commit: ' + commit.commit.message,
+            url: commit.html_url,
+          };
+          model = new activities_dashboard_namespace.ActivityModel(data)
+          // attach commit hash to identify timestamp of tags
+          model.commit_shas = [commit.sha];
+          //activity_collection.add(model, {merge: true});
+          models.push(model);
+        });
+        if (complete_callback) {
+          complete_callback(true);
+        }
+      }
+    }, this);
+  };
+
+  var query_issues = function(github, full_name, models, complete_callback) {
+    console.debug('query_issues()');
+
+    github.issues(full_name, function(err, res) {
+      if (err) {
+        console.error('query_issues() err code: ' + err);
+        if (complete_callback) {
+          complete_callback(null);
+        }
+      } else {
+        _(res).each(function(issue) {
+          if (issue.pull_request) {
+            console.debug('query_issues() pull request: ' + issue.number);
+          } else {
+            console.debug('query_issues() issue: ' + issue.number);
+          }
+          var data = {
+            timestamp: new Date(issue.created_at),
+            issues_opened: issue.pull_request ? 0 : 1,
+            issues_closed: 0,
+            issue_comments: 0,
+            pull_requests_opened: issue.pull_request ? 1 : 0,
+            pull_requests_closed: 0,
+            pull_request_comments: 0,
+            tags: 0,
+            commits: 0,
+            text: '#' + issue.number + ': ' + issue.title,
+            url: issue.html_url,
+          };
+          //activity_collection.add(new activities_dashboard_namespace.ActivityModel(data), {merge: true});
+          models.push(new activities_dashboard_namespace.ActivityModel(data));
+          if (issue.closed_at) {
+            var data = {
+              timestamp: new Date(issue.closed_at),
+              issues_opened: 0,
+              issues_closed: issue.pull_request ? 0 : 1,
+              issue_comments: 0,
+              pull_requests_opened: 0,
+              pull_requests_closed: issue.pull_request ? 1 : 0,
+              pull_request_comments: 0,
+              tags: 0,
+              commits: 0,
+              text: '#' + issue.number + ': ' + issue.title,
+              url: issue.html_url,
+            };
+            //activity_collection.add(new activities_dashboard_namespace.ActivityModel(data), {merge: true});
+            models.push(new activities_dashboard_namespace.ActivityModel(data));
+          }
+        });
+        if (complete_callback) {
+          complete_callback(true);
+        }
+      }
+    }, this);
+  };
+
+  var query_tags = function(github, full_name, models, complete_callback) {
+    console.debug('query_tags()');
+
+    github.tags(full_name, function(err, res) {
+      if (err) {
+        console.error('query_tags() err code: ' + err);
+        if (complete_callback) {
+          complete_callback(null);
+        }
+      } else {
+        _(res).each(function(tag) {
+          console.debug('query_tags() tag: ' + tag.name);
+          for (var i in models) {
+            model = models[i];
+            if (model.get('commits') == 0) continue;
+            if (model.commit_shas.indexOf(tag.commit.sha) == -1) {
+              continue;
+            }
+            var data = {
+              timestamp: new Date(model.get('timestamp')),
+              issues_opened: 0,
+              issues_closed: 0,
+              issue_comments: 0,
+              pull_requests_opened: 0,
+              pull_requests_closed: 0,
+              pull_request_comments: 0,
+              tags: 1,
+              commits: 0,
+              text: 'Tag: ' + tag.name,
+              url: model.get('url'),
+            };
+            //activity_collection.add(new activities_dashboard_namespace.ActivityModel(data), {merge: true});
+            models.push(new activities_dashboard_namespace.ActivityModel(data));
+            console.debug('query_tags() known commit for tag');
+            break;
+          }
+        });
         if (complete_callback) {
           complete_callback(true);
         }
@@ -210,7 +394,6 @@
       name: repo.name,
       full_name: repo.full_name,
       repo_url: repo.html_url,
-      contributions_url: repo.html_url + '/graphs/code-frequency',
       is_starred: false,
     };
   };
@@ -242,8 +425,8 @@
           if (group_model.get('starred_repos').indexOf(data.name) != -1) {
             data.is_starred = true;
           }
-          //repository_collection.add(new statistics_dashboard_namespace.RepositoryModel(data), {merge: true});
-          models.push(new statistics_dashboard_namespace.RepositoryModel(data));
+          //repository_collection.add(new activities_dashboard_namespace.RepositoryModel(data), {merge: true});
+          models.push(new activities_dashboard_namespace.RepositoryModel(data));
         });
         repository_collection.set(models);
         if (complete_callback) {
@@ -281,8 +464,8 @@
           if (org_model.get('starred_repos').indexOf(data.name) != -1) {
             data.is_starred = true;
           }
-          //repository_collection.add(new statistics_dashboard_namespace.RepositoryModel(data), {merge: true});
-          models.push(new statistics_dashboard_namespace.RepositoryModel(data));
+          //repository_collection.add(new activities_dashboard_namespace.RepositoryModel(data), {merge: true});
+          models.push(new activities_dashboard_namespace.RepositoryModel(data));
         });
         repository_collection.set(models);
         if (complete_callback) {
@@ -344,8 +527,8 @@
                 avatar_url: group.avatar_url,
                 starred_repos: get_starred_repos(res_starred, group.login),
               };
-              //group_collection.add(new statistics_dashboard_namespace.GroupModel(data), {merge: true});
-              models.push(new statistics_dashboard_namespace.GroupModel(data));
+              //group_collection.add(new activities_dashboard_namespace.GroupModel(data), {merge: true});
+              models.push(new activities_dashboard_namespace.GroupModel(data));
             });
             group_collection.set(models);
           }
@@ -381,20 +564,19 @@
         }
       }
 
-      function _query_contributors_stats(model, contribution_collection, complete_callback) {
-        console.debug('_query_contributors_stats()');
+      function _query_activities(model, activity_collection, complete_callback) {
+        console.debug('_query_activities()');
         var github = github_model.get('github');
         var full_name = model.get('full_name');
-        var user = github_model.get('user');
-        query_contributors_stats(github, full_name, user, contribution_collection, complete_callback);
+        query_activities(github, full_name, activity_collection, complete_callback);
       }
 
-      this.group_collection = new statistics_dashboard_namespace.GroupCollection();
-      this.group_list_view = new statistics_dashboard_namespace.GroupListView({
+      this.group_collection = new activities_dashboard_namespace.GroupCollection();
+      this.group_list_view = new activities_dashboard_namespace.GroupListView({
         collection: this.group_collection,
         query_groups: _query_groups,
         query_group_repos: _query_group_repos,
-        query_contributors_stats: _query_contributors_stats,
+        query_activities: _query_activities,
       });
       this.$el.append(this.group_list_view.render().el);
 
@@ -452,4 +634,4 @@
     };
   };
 
-})(window.github_provider = window.github_provider || {}, window.github, window.statistics_dashboard);
+})(window.github_provider = window.github_provider || {}, window.github, window.activities_dashboard);
