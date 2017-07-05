@@ -59,24 +59,36 @@
 
     // List comments for the specified repository
     // https://developer.github.com/v3/issues/comments/#list-comments-in-a-repository
-    this.comments = function(full_name, cb) {
-      _get_all('/repos/' + full_name + '/issues/comments', function(err, res) {
+    this.comments = function(full_name, since, cb) {
+      url = '/repos/' + full_name + '/issues/comments';
+      if (since) {
+        url += '?since=' + since;
+      }
+      _get_all(url, function(err, res) {
         cb(err, res);
       });
     };
 
     // List commits for the specified repository
     // https://developer.github.com/v3/repos/commits/#list-commits-on-a-repository
-    this.commits = function(full_name, cb) {
-      _get_all('/repos/' + full_name + '/commits', function(err, res) {
+    this.commits = function(full_name, since, cb) {
+      url = '/repos/' + full_name + '/commits';
+      if (since) {
+        url += '?since=' + since;
+      }
+      _get_all(url, function(err, res) {
         cb(err, res);
       });
     };
 
     // List issues for the specified repository
     // https://developer.github.com/v3/issues/#list-issues-for-a-repository
-    this.issues = function(full_name, cb) {
-      _get_all('/repos/' + full_name + '/issues?state=all', function(err, res) {
+    this.issues = function(full_name, since, cb) {
+      url = '/repos/' + full_name + '/issues?state=all';
+      if (since) {
+        url += '&since=' + since;
+      }
+      _get_all(url, function(err, res) {
         cb(err, res);
       });
     };

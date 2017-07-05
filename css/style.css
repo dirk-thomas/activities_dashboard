@@ -166,10 +166,12 @@ body {
 .group_header .actions {
   float: right;
 }
-.group_header .query_repos {
+.group_header .query_repos,
+.group_header .remove_group {
   display: none;
 }
-.group_header:hover .query_repos {
+.group_header:hover .query_repos,
+.group_header:hover .remove_group {
   display: initial;
 }
 
@@ -200,11 +202,13 @@ body {
   visibility: hidden;
 }
 .repo_header .reset_activities,
-.repo_header .query_activities {
+.repo_header .query_activities,
+.repo_header .remove_repo {
   display: none;
 }
 .repo_header:hover .reset_activities,
-.repo_header:hover .query_activities {
+.repo_header:hover .query_activities,
+.repo_header:hover .remove_repo {
   display: initial;
 }
 .repo_header .badge {

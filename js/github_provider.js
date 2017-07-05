@@ -163,28 +163,34 @@
   });
 
 
-  var query_activities = function(github, full_name, activity_collection, complete_callback) {
-    console.debug('query_activities()');
+  var query_activities = function(github, full_name, age, activity_collection, complete_callback) {
+    console.debug('query_activities() ' + age);
+    var since = null;
+    if (age) {
+      since = new Date(Date.now() - age);
+      since.setUTCHours(0, 0, 0, 0);
+      since = since.toISOString();
+    }
     var models = [];
-    query_comments(github, full_name, models, function(loaded) {
+    query_comments(github, full_name, since, models, function(loaded) {
       if (loaded !== true) {
         if (complete_callback) {
           complete_callback(null);
         }
       } else {
-        query_commits(github, full_name, models, function(loaded) {
+        query_commits(github, full_name, since, models, function(loaded) {
           if (loaded !== true) {
             if (complete_callback) {
               complete_callback(null);
             }
           } else {
-            query_issues(github, full_name, models, function(loaded) {
+            query_issues(github, full_name, since, models, function(loaded) {
               if (loaded !== true) {
                 if (complete_callback) {
                   complete_callback(null);
                 }
               } else {
-                query_tags(github, full_name, models, function(loaded) {
+                query_tags(github, full_name, since, models, function(loaded) {
                   if (loaded !== true) {
                     if (complete_callback) {
                       complete_callback(null);
@@ -205,10 +211,10 @@
     }, this);
   };
 
-  var query_comments = function(github, full_name, models, complete_callback) {
+  var query_comments = function(github, full_name, since, models, complete_callback) {
     console.debug('query_comments()');
 
-    github.comments(full_name, function(err, res) {
+    github.comments(full_name, since, function(err, res) {
       if (err) {
         console.error('query_comments() err code: ' + err);
         if (complete_callback) {
@@ -249,10 +255,10 @@
     }, this);
   };
 
-  var query_commits = function(github, full_name, models, complete_callback) {
+  var query_commits = function(github, full_name, since, models, complete_callback) {
     console.debug('query_commits()');
 
-    github.commits(full_name, function(err, res) {
+    github.commits(full_name, since, function(err, res) {
       if (err) {
         console.error('query_commits() err code: ' + err);
         if (complete_callback) {
@@ -287,10 +293,10 @@
     }, this);
   };
 
-  var query_issues = function(github, full_name, models, complete_callback) {
+  var query_issues = function(github, full_name, since, models, complete_callback) {
     console.debug('query_issues()');
 
-    github.issues(full_name, function(err, res) {
+    github.issues(full_name, since, function(err, res) {
       if (err) {
         console.error('query_issues() err code: ' + err);
         if (complete_callback) {
@@ -343,7 +349,7 @@
     }, this);
   };
 
-  var query_tags = function(github, full_name, models, complete_callback) {
+  var query_tags = function(github, full_name, since, models, complete_callback) {
     console.debug('query_tags()');
 
     github.tags(full_name, function(err, res) {
@@ -361,6 +367,7 @@
             if (model.commit_shas.indexOf(tag.commit.sha) == -1) {
               continue;
             }
+            // TODO check since
             var data = {
               timestamp: new Date(model.get('timestamp')),
               issues_opened: 0,
@@ -564,11 +571,13 @@
         }
       }
 
+      var self = this;
       function _query_activities(model, activity_collection, complete_callback) {
         console.debug('_query_activities()');
         var github = github_model.get('github');
         var full_name = model.get('full_name');
-        query_activities(github, full_name, activity_collection, complete_callback);
+        var age = self.group_list_view._filter_model.get('age');
+        query_activities(github, full_name, age, activity_collection, complete_callback);
       }
 
       this.group_collection = new activities_dashboard_namespace.GroupCollection();

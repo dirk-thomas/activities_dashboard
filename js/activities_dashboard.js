@@ -190,6 +190,21 @@
       this.tags -= summary.tags;
       this.commits -= summary.commits;
     };
+    this.isEqual = function(summary) {
+      if (!summary) {
+        return false;
+      }
+      return (
+        this.issues_opened === summary.issues_opened &&
+        this.issues_closed === summary.issues_closed &&
+        this.issue_comments === summary.issue_comments &&
+        this.pull_requests_opened === summary.pull_requests_opened &&
+        this.pull_requests_closed === summary.pull_requests_closed &&
+        this.pull_request_comments === summary.pull_request_comments &&
+        this.tags === summary.tags &&
+        this.commits === summary.commits
+      );
+    };
     this.reset = function() {
       this.issues_opened = 0;
       this.issues_closed = 0;
@@ -233,9 +248,11 @@
       'click .repo_header': 'toggle_activitylist',
       'click .reset_activities': 'reset_activities',
       'click .query_activities': 'query_activities',
+      'click .remove_repo': 'remove_repo',
     },
     initialize: function(options) {
       console.debug('RepositoryView.initialize() full_name: ' + this.model.get('full_name'));
+      this.repo_collection = options.repo_collection;
       this._filter_model = options.filter_model;
       this._query_activities = options.query_activities;
       this.$el.html('<div class="repo_header"></div>');
@@ -260,25 +277,7 @@
     },
     render: function() {
       console.debug('RepositoryView.render() full_name: ' + this.model.get('full_name'));
-      // can't use a default value in order to not overwrite values
-      // when models are updated with new models from the provider
-      var missing = !this.model.has('activity_summary');
-      if (missing) {
-        this.model.set({
-          activity_summary: new namespace.ActivitySummary()}, {silent: true});
-      }
-      var matched_missing = !this.model.has('matched_activity_summary');
-      if (matched_missing) {
-        this.model.set({
-          matched_activity_summary: new namespace.ActivitySummary()}, {silent: true});
-      }
-      this.$('.repo_header').html(this.template(this.model.toJSON()));
-      if (missing) {
-        this.model.unset('activity_summary', {silent: true});
-      }
-      if (matched_missing) {
-        this.model.unset('matched_activity_summary', {silent: true});
-      }
+      this.$('.repo_header').html(this.template(this._get_render_data()));
 
       this.$('.repo_header .loader').hide();
       if (this.activitylist_folded) {
@@ -289,6 +288,18 @@
         this.$('.activitylist').show();
       }
       return this;
+    },
+    _get_render_data: function() {
+      var data = this.model.toJSON();
+      // can't use a default value in order to not overwrite values
+      // when models are updated with new models from the provider
+      if (!data['activity_summary']) {
+        data['activity_summary'] = new namespace.ActivitySummary();
+      }
+      if (!data['matched_activity_summary']) {
+        data['matched_activity_summary'] = new namespace.ActivitySummary();
+      }
+      return data;
     },
     update_filter_match: function() {
       console.debug('RepositoryView.update_filter_match()');
@@ -410,6 +421,13 @@
         this.model.set({matched_activity_summary: summary});
       }
     },
+    remove_repo: function(event) {
+      console.log('RepositoryView.remove_repo() full_name: ' + this.model.get('full_name'));
+      if (event) {
+        event.stopPropagation();
+      }
+      this.repo_collection.remove(this.model);
+    },
   });
 
   namespace.RepositoryListView = Backbone.View.extend({
@@ -429,6 +447,7 @@
     },
     addOne: function(model) {
       var view = new namespace.RepositoryView({
+        repo_collection: this.collection,
         model: model,
         filter_model: this._filter_model,
         query_activities: this._query_activities,
@@ -488,9 +507,11 @@
       'click a': 'skip_event',
       'click .group_header': 'toggle_repolist',
       'click .query_repos': 'query_repos',
+      'click .remove_group': 'remove_group',
     },
     initialize: function(options) {
       console.debug('GroupView.initialize() group: ' + this.model.get('name'));
+      this.group_collection = options.group_collection;
       this._filter_model = options.filter_model;
       this._query_group_repos = options.query_group_repos;
       this._query_activities = options.query_activities;
@@ -619,11 +640,6 @@
     },
     update_matched_activity_summary: function(repo_model) {
       console.debug('GroupView.update_matched_activity_summary() group: ' + this.model.get('name'));
-      var summary = this.model.get('matched_activity_summary');
-      var repo_model_previous_summary = null;
-      if (repo_model) {
-        repo_model.previous('matched_activity_summary');
-      }
       // can't use previous summary since for multiple adds the previous value is the same value which would result in increasing offsets
       // therefore not using the offset at all but recompute the sum every time
       var summary = new namespace.ActivitySummary();
@@ -647,6 +663,13 @@
         is_starred = starred_repos.indexOf(repo_model.get('name')) != -1;
         repo_model.set({is_starred: is_starred});
       });
+    },
+    remove_group: function(event) {
+      console.log('GroupView.remove_group() full_name: ' + this.model.get('name'));
+      if (event) {
+        event.stopPropagation();
+      }
+      this.group_collection.remove(this.model);
     },
   });
 
@@ -678,6 +701,7 @@
     addOne: function(model) {
       var view = new namespace.GroupView({
         model: model,
+        group_collection: this.collection,
         filter_model: this._filter_model,
         query_group_repos: this._query_group_repos,
         query_activities: this._query_activities,
@@ -715,7 +739,7 @@
   namespace.FilterModel = Backbone.Model.extend({
     defaults: {
       'starred': false,
-      'age': 0,
+      'age': 365 * 24 * 60 * 60 * 1000,
     },
     match_group: function(group_model) {
       var starred = this.get('starred');
